@@ -167,7 +167,9 @@ async function fetchReminders() {
   try {
     const response = await fetch(`${API_URL}/reminders`);
     if (!response.ok) throw new Error('Failed to fetch data');
-    reminders = await response.json();
+    const data = await response.json();
+    // Normalize MongoDB _id → id so all code works consistently
+    reminders = data.map(r => ({ ...r, id: r._id || r.id }));
     updateStats();
     renderReminders();
   } catch (error) {
@@ -175,6 +177,7 @@ async function fetchReminders() {
     showToast('ดึงข้อมูลนัดหมายไม่สำเร็จค่ะเตง 😢', 'error');
   }
 }
+
 
 // Update Dashboard Statistics
 function updateStats() {
