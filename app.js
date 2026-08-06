@@ -311,17 +311,23 @@ function createReminderCard(reminder) {
         ${reminder.notes ? `<p class="text-xs text-slate-500 leading-relaxed font-normal bg-slate-50/50 p-2 rounded-xl border border-slate-100/50">${reminder.notes}</p>` : ''}
       </div>
     </div>
-    
-    <div class="flex items-center gap-4 justify-between w-full md:w-auto border-t md:border-t-0 border-slate-100/70 pt-3 md:pt-0">
+        <div class="flex items-center gap-2 justify-between w-full md:w-auto border-t md:border-t-0 border-slate-100/70 pt-3 md:pt-0">
       <div class="text-xs">
         ${timeInfo}
       </div>
       
-      <button onclick="deleteReminder('${reminder.id}')" 
-              class="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all duration-200 cursor-pointer" 
-              title="ลบรายการ">
-        <i data-lucide="trash-2" class="w-4.5 h-4.5"></i>
-      </button>
+      <div class="flex items-center gap-1">
+        <button onclick="openEditModal('${reminder.id}')" 
+                class="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-xl transition-all duration-200 cursor-pointer" 
+                title="แก้ไขรายการ">
+          <i data-lucide="pencil" class="w-4 h-4"></i>
+        </button>
+        <button onclick="deleteReminder('${reminder.id}')" 
+                class="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all duration-200 cursor-pointer" 
+                title="ลบรายการ">
+          <i data-lucide="trash-2" class="w-4.5 h-4.5"></i>
+        </button>
+      </div>
     </div>
   `;
   
@@ -435,6 +441,87 @@ async function deleteReminder(id) {
 // Global scope references for inline HTML onclick handlers
 window.toggleReminder = toggleReminder;
 window.deleteReminder = deleteReminder;
+window.openEditModal = openEditModal;
+
+// Edit Modal Logic
+const editModal = document.getElementById('edit-modal');
+const editForm = document.getElementById('edit-form');
+const closeEditModalBtn = document.getElementById('close-edit-modal');
+const cancelEditBtn = document.getElementById('cancel-edit-btn');
+
+function openEditModal(id) {
+  const reminder = reminders.find(r => r.id === id || r._id === id);
+  if (!reminder) return;
+
+  const reminderId = reminder._id || reminder.id;
+
+  // Populate form fields
+  document.getElementById('edit-id').value = reminderId;
+  document.getElementById('edit-title').value = reminder.title;
+  document.getElementById('edit-date').value = reminder.date;
+  document.getElementById('edit-time').value = reminder.time;
+  document.getElementById('edit-notes').value = reminder.notes || '';
+
+  // Set category radio
+  const categoryRadio = document.querySelector(`input[name="edit-category"][value="${reminder.category}"]`);
+  if (categoryRadio) categoryRadio.checked = true;
+
+  // Show modal
+  editModal.classList.remove('hidden');
+  lucide.createIcons();
+  document.getElementById('edit-title').focus();
+}
+
+function closeEditModal() {
+  editModal.classList.add('hidden');
+  editForm.reset();
+}
+
+closeEditModalBtn.addEventListener('click', closeEditModal);
+cancelEditBtn.addEventListener('click', closeEditModal);
+
+// Close modal when clicking backdrop
+editModal.addEventListener('click', (e) => {
+  if (e.target === editModal) closeEditModal();
+});
+
+// Save edit
+editForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const id = document.getElementById('edit-id').value;
+  const title = document.getElementById('edit-title').value.trim();
+  const date = document.getElementById('edit-date').value;
+  const time = document.getElementById('edit-time').value;
+  const category = document.querySelector('input[name="edit-category"]:checked').value;
+  const notes = document.getElementById('edit-notes').value.trim();
+
+  if (!title || !date || !time) return;
+
+  try {
+    const response = await fetch(`${API_URL}/reminders/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, date, time, category, notes })
+    });
+
+    if (!response.ok) throw new Error('Failed to update');
+
+    const updated = await response.json();
+
+    // Update local state
+    const index = reminders.findIndex(r => (r._id || r.id) === id);
+    if (index !== -1) reminders[index] = updated;
+
+    closeEditModal();
+    updateStats();
+    renderReminders();
+    showToast('อัปเดตนัดหมายเรียบร้อยแล้วค่ะเตง ✏️', 'success');
+  } catch (error) {
+    console.error('Error updating reminder:', error);
+    showToast('แก้ไขข้อมูลไม่สำเร็จค่ะเตง ลองใหม่นะคะ', 'error');
+  }
+});
 
 // Tab switcher logic
 tabActive.addEventListener('click', () => {
