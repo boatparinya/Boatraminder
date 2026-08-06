@@ -1,0 +1,86 @@
+/* Custom CSS Styles to augment Tailwind CSS and add premium micro-interactions */
+
+/* Smooth page load fade-in */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+main, header {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Card hover animation */
+.reminder-card {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.reminder-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 20px -8px rgba(0, 0, 0, 0.08);
+}
+
+/* Styled radio check animation */
+input[type="radio"]:checked + span + div {
+  display: flex !important;
+}
+
+input[type="radio"]:checked + i + span + div {
+  display: flex !important;
+}
+
+/* Category borders classes */
+.category-border-study {
+  border-left: 5px solid #1E88E5;
+}
+
+.category-border-faculty {
+  border-left: 5px solid #8E24AA;
+}
+
+.category-border-personal {
+  border-left: 5px solid #43A047;
+}
+
+/* Styled Toast Alert Animation */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.toast-item {
+  animation: slideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.toast-item.leaving {
+  animation: fadeOut 0.3s ease-in forwards;
+}
+
+/* Completion line-through animation */
+.completed-title {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
