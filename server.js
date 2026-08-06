@@ -71,10 +71,10 @@ function calcNotificationFlags(date, time) {
 
 // Add a new reminder
 app.post('/api/reminders', async (req, res) => {
-  const { title, date, time, category, notes } = req.body;
+  const { title, date, time, notes } = req.body;
 
-  if (!title || !date || !time || !category) {
-    return res.status(400).json({ error: 'Title, date, time, and category are required' });
+  if (!title || !date || !time) {
+    return res.status(400).json({ error: 'Title, date, and time are required' });
   }
 
   try {
@@ -83,7 +83,6 @@ app.post('/api/reminders', async (req, res) => {
       title,
       date,
       time,
-      category,
       notes: notes || '',
       completed: false,
       ...flags
@@ -129,7 +128,6 @@ app.put('/api/reminders/:id', async (req, res) => {
       reminder.notified      = false;
     }
 
-    if (req.body.category) reminder.category = req.body.category;
     if (req.body.notes !== undefined) reminder.notes = req.body.notes;
 
     const updated = await reminder.save();

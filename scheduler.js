@@ -13,21 +13,15 @@ function sendLineMessage(reminder, type) {
     return Promise.resolve(true);
   }
 
-  const categoryLabel = {
-    study: 'การเรียน 📚',
-    faculty: 'กิจกรรมคณะ 👥',
-    personal: 'เรื่องส่วนตัว 🏠'
-  }[reminder.category] || 'ทั่วไป 📅';
-
   // Message template ตามประเภทการแจ้งเตือน
   let messageText = '';
 
   if (type === '1day') {
-    messageText = `🗓️ เตือนล่วงหน้า 1 วันค่ะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n🏷️ หมวดหมู่: ${categoryLabel}\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nพรุ่งนี้แล้วนะคะ เตรียมตัวให้พร้อมด้วยนะเตง 💪`;
+    messageText = `🗓️ เตือนล่วงหน้า 1 วันค่ะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nพรุ่งนี้แล้วนะคะ เตรียมตัวให้พร้อมด้วยนะเตง 💪`;
   } else if (type === '1hour') {
-    messageText = `⏰ อีก 1 ชั่วโมงแล้วนะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n🏷️ หมวดหมู่: ${categoryLabel}\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nใกล้ถึงเวลาแล้วค่ะ อย่าลืมเตรียมพร้อมด้วยนะคะ! 🌸`;
+    messageText = `⏰ อีก 1 ชั่วโมงแล้วนะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nใกล้ถึงเวลาแล้วค่ะ อย่าลืมเตรียมพร้อมด้วยนะคะ! 🌸`;
   } else {
-    messageText = `🔔 ถึงเวลาแล้วค่ะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n🏷️ หมวดหมู่: ${categoryLabel}\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nสู้ๆ นะคะเตง เค้าเป็นกำลังใจให้! 💕`;
+    messageText = `🔔 ถึงเวลาแล้วค่ะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nสู้ๆ นะคะเตง เค้าเป็นกำลังใจให้! 💕`;
   }
 
   const postData = JSON.stringify({

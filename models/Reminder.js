@@ -14,11 +14,6 @@ const reminderSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  category: {
-    type: String,
-    required: true,
-    enum: ['study', 'faculty', 'personal']
-  },
   notes: {
     type: String,
     default: ''

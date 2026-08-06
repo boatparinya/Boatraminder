@@ -262,22 +262,7 @@ function renderReminders() {
 function createReminderCard(reminder) {
   const card = document.createElement('div');
   
-  // Determine categories class styles
-  let catBadgeBg = 'bg-blue-100 text-blue-700';
-  let catLabel = 'การเรียน';
-  let borderLeftColor = 'category-border-study';
-  
-  if (reminder.category === 'faculty') {
-    catBadgeBg = 'bg-purple-100 text-purple-700';
-    catLabel = 'กิจกรรมคณะ';
-    borderLeftColor = 'category-border-faculty';
-  } else if (reminder.category === 'personal') {
-    catBadgeBg = 'bg-green-100 text-green-700';
-    catLabel = 'เรื่องส่วนตัว';
-    borderLeftColor = 'category-border-personal';
-  }
-  
-  card.className = `reminder-card glass-card rounded-2xl p-5 border-l-4 ${borderLeftColor} relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all duration-300`;
+  card.className = `reminder-card glass-card rounded-2xl p-5 relative flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-all duration-300`;
   card.dataset.id = reminder.id;
   
   // Format Date to Local Thai
@@ -300,7 +285,6 @@ function createReminderCard(reminder) {
       
       <div class="space-y-1.5">
         <div class="flex flex-wrap items-center gap-2">
-          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${catBadgeBg}">${catLabel}</span>
           <span class="text-slate-400 text-xs flex items-center gap-1 font-medium">
             <i data-lucide="calendar-days" class="w-3 h-3"></i> ${thaiDateStr}
           </span>
@@ -344,7 +328,6 @@ reminderForm.addEventListener('submit', async (e) => {
   const title = titleInput.value.trim();
   const date = dateInput.value;
   const time = timeInput.value;
-  const category = document.querySelector('input[name="reminder-category"]:checked').value;
   const notes = notesInput.value.trim();
   
   if (!title || !date || !time) return;
@@ -355,7 +338,7 @@ reminderForm.addEventListener('submit', async (e) => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ title, date, time, category, notes })
+      body: JSON.stringify({ title, date, time, notes })
     });
     
     if (!response.ok) throw new Error('Failed to create reminder');
@@ -465,10 +448,6 @@ function openEditModal(id) {
   document.getElementById('edit-time').value = reminder.time;
   document.getElementById('edit-notes').value = reminder.notes || '';
 
-  // Set category radio
-  const categoryRadio = document.querySelector(`input[name="edit-category"][value="${reminder.category}"]`);
-  if (categoryRadio) categoryRadio.checked = true;
-
   // Show modal
   editModal.classList.remove('hidden');
   lucide.createIcons();
@@ -496,7 +475,6 @@ editForm.addEventListener('submit', async (e) => {
   const title = document.getElementById('edit-title').value.trim();
   const date = document.getElementById('edit-date').value;
   const time = document.getElementById('edit-time').value;
-  const category = document.querySelector('input[name="edit-category"]:checked').value;
   const notes = document.getElementById('edit-notes').value.trim();
 
   if (!title || !date || !time) return;
@@ -505,7 +483,7 @@ editForm.addEventListener('submit', async (e) => {
     const response = await fetch(`${API_URL}/reminders/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, date, time, category, notes })
+      body: JSON.stringify({ title, date, time, notes })
     });
 
     if (!response.ok) throw new Error('Failed to update');
