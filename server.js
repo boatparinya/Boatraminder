@@ -54,6 +54,21 @@ app.get('/api/reminders', async (req, res) => {
   }
 });
 
+// Helper: คำนวณว่าควร skip notification ไหนบ้าง
+function calcNotificationFlags(date, time) {
+  const now = new Date();
+  const reminderTime = new Date(`${date}T${time}`);
+  const diffMs = reminderTime - now;
+  const ONE_DAY_MS  = 24 * 60 * 60 * 1000;
+  const ONE_HOUR_MS = 60 * 60 * 1000;
+
+  return {
+    notified1Day:  diffMs < ONE_DAY_MS,   // เหลือ < 1 วัน → ข้ามแจ้ง 1 วัน
+    notified1Hour: diffMs < ONE_HOUR_MS,  // เหลือ < 1 ชม → ข้ามแจ้ง 1 ชม
+    notified: false
+  };
+}
+
 // Add a new reminder
 app.post('/api/reminders', async (req, res) => {
   const { title, date, time, category, notes } = req.body;
@@ -63,6 +78,7 @@ app.post('/api/reminders', async (req, res) => {
   }
 
   try {
+    const flags = calcNotificationFlags(date, time);
     const newReminder = new Reminder({
       title,
       date,
@@ -70,7 +86,7 @@ app.post('/api/reminders', async (req, res) => {
       category,
       notes: notes || '',
       completed: false,
-      notified: false
+      ...flags
     });
 
     const saved = await newReminder.save();
@@ -101,14 +117,16 @@ app.put('/api/reminders/:id', async (req, res) => {
 
     if (req.body.title) reminder.title = req.body.title;
 
-    if (req.body.date) {
-      reminder.date = req.body.date;
-      reminder.notified = false; // Reset if date changes
-    }
+    // ถ้าแก้ date หรือ time → คำนวณ flags ใหม่
+    if (req.body.date || req.body.time) {
+      if (req.body.date) reminder.date = req.body.date;
+      if (req.body.time) reminder.time = req.body.time;
 
-    if (req.body.time) {
-      reminder.time = req.body.time;
-      reminder.notified = false; // Reset if time changes
+      // คำนวณ flags ใหม่ตาม date/time ที่เปลี่ยน
+      const flags = calcNotificationFlags(reminder.date, reminder.time);
+      reminder.notified1Day  = flags.notified1Day;
+      reminder.notified1Hour = flags.notified1Hour;
+      reminder.notified      = false;
     }
 
     if (req.body.category) reminder.category = req.body.category;
