@@ -1,22 +1,15 @@
 require('dotenv').config();
 const cron = require('node-cron');
 const https = require('https');
-const mongoose = require('mongoose');
 const Reminder = require('./models/Reminder');
 
-// Send LINE message via Messaging API Push Message
-function sendLineMessage(reminder) {
+// Send LINE message
+function sendLineMessage(reminder, type) {
   const token = process.env.LINE_CHANNEL_ACCESS_TOKEN;
   const userId = process.env.LINE_USER_ID;
 
-  // Check if credentials are set
   if (!token || !userId || token.includes('YOUR_') || userId.includes('YOUR_')) {
-    console.log(`==================================================`);
-    console.log(`[LINE Notifier] ⚠️ แจ้งเตือนจำลอง (ยังไม่ได้ตั้งค่า Token จริงใน .env):`);
-    console.log(`📌 ชื่องาน: "${reminder.title}"`);
-    console.log(`⏰ ถึงกำหนดเวลา: ${reminder.date} ตอน ${reminder.time} น.`);
-    console.log(`📝 หมายเหตุ: ${reminder.notes || '-'}`);
-    console.log(`==================================================`);
+    console.log(`[LINE Notifier] ⚠️ แจ้งเตือนจำลอง (${type}): "${reminder.title}"`);
     return Promise.resolve(true);
   }
 
@@ -26,16 +19,20 @@ function sendLineMessage(reminder) {
     personal: 'เรื่องส่วนตัว 🏠'
   }[reminder.category] || 'ทั่วไป 📅';
 
-  const messageText = `🌸 สวัสดีค่ะเตง! Gigi มีแจ้งเตือนกิจกรรมน้าาา 🔔\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n🏷️ หมวดหมู่: ${categoryLabel}\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nสู้ๆ นะคะเตง เค้าเป็นกำลังใจให้! 💕`;
+  // Message template ตามประเภทการแจ้งเตือน
+  let messageText = '';
+
+  if (type === '1day') {
+    messageText = `🗓️ เตือนล่วงหน้า 1 วันค่ะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n🏷️ หมวดหมู่: ${categoryLabel}\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nพรุ่งนี้แล้วนะคะ เตรียมตัวให้พร้อมด้วยนะเตง 💪`;
+  } else if (type === '1hour') {
+    messageText = `⏰ อีก 1 ชั่วโมงแล้วนะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n🏷️ หมวดหมู่: ${categoryLabel}\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nใกล้ถึงเวลาแล้วค่ะ อย่าลืมเตรียมพร้อมด้วยนะคะ! 🌸`;
+  } else {
+    messageText = `🔔 ถึงเวลาแล้วค่ะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n🏷️ หมวดหมู่: ${categoryLabel}\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nสู้ๆ นะคะเตง เค้าเป็นกำลังใจให้! 💕`;
+  }
 
   const postData = JSON.stringify({
     to: userId,
-    messages: [
-      {
-        type: 'text',
-        text: messageText
-      }
-    ]
+    messages: [{ type: 'text', text: messageText }]
   });
 
   const options = {
@@ -53,65 +50,90 @@ function sendLineMessage(reminder) {
   return new Promise((resolve) => {
     const req = https.request(options, (res) => {
       let body = '';
-      res.on('data', (chunk) => body += chunk);
+      res.on('data', chunk => body += chunk);
       res.on('end', () => {
         if (res.statusCode === 200) {
-          console.log(`[LINE Notifier] ✅ ส่งแจ้งเตือนงาน "${reminder.title}" สำเร็จแล้วค่ะ!`);
+          console.log(`[LINE Notifier] ✅ ส่งแจ้งเตือน (${type}) งาน "${reminder.title}" สำเร็จ!`);
           resolve(true);
         } else {
-          console.error(`[LINE Notifier] ❌ ส่งไม่สำเร็จ (Status: ${res.statusCode}):`, body);
+          console.error(`[LINE Notifier] ❌ ส่งไม่สำเร็จ (${type}, Status: ${res.statusCode}):`, body);
           resolve(false);
         }
       });
     });
-
     req.on('error', (e) => {
-      console.error(`[LINE Notifier] ❌ HTTP Request Error:`, e);
+      console.error(`[LINE Notifier] ❌ HTTP Error:`, e);
       resolve(false);
     });
-
     req.write(postData);
     req.end();
   });
 }
 
-// Core logic to check reminders and notify
+// Core logic: เช็กและแจ้งเตือน
 async function checkAndNotifyReminders() {
   try {
     const now = new Date();
-
-    // Find reminders that are not completed and not yet notified
-    const reminders = await Reminder.find({ completed: false, notified: false });
+    const reminders = await Reminder.find({ completed: false });
 
     for (let reminder of reminders) {
       const reminderTime = new Date(`${reminder.date}T${reminder.time}`);
+      const diffMs = reminderTime - now; // milliseconds เหลืออยู่
 
-      if (reminderTime <= now) {
-        console.log(`[Scheduler] 🔔 ตรวจพบงานถึงกำหนด: "${reminder.title}" (${reminder.date} ${reminder.time})`);
+      const ONE_DAY_MS   = 24 * 60 * 60 * 1000;
+      const ONE_HOUR_MS  = 60 * 60 * 1000;
 
-        const success = await sendLineMessage(reminder);
+      let hasChanges = false;
+
+      // 🗓️ แจ้งเตือน 1 วันก่อน (diffMs อยู่ระหว่าง 23h55m ~ 24h5m)
+      if (!reminder.notified1Day && diffMs > 0 && diffMs <= ONE_DAY_MS && diffMs > ONE_HOUR_MS) {
+        console.log(`[Scheduler] 🗓️ แจ้งล่วงหน้า 1 วัน: "${reminder.title}"`);
+        const success = await sendLineMessage(reminder, '1day');
+        if (success) {
+          reminder.notified1Day = true;
+          hasChanges = true;
+        }
+      }
+
+      // ⏰ แจ้งเตือน 1 ชั่วโมงก่อน (diffMs อยู่ระหว่าง 0 ~ 1h)
+      if (!reminder.notified1Hour && diffMs > 0 && diffMs <= ONE_HOUR_MS) {
+        console.log(`[Scheduler] ⏰ แจ้งล่วงหน้า 1 ชม.: "${reminder.title}"`);
+        const success = await sendLineMessage(reminder, '1hour');
+        if (success) {
+          reminder.notified1Hour = true;
+          hasChanges = true;
+        }
+      }
+
+      // 🔔 แจ้งเตือนตรงเวลา (diffMs <= 0)
+      if (!reminder.notified && diffMs <= 0) {
+        console.log(`[Scheduler] 🔔 ถึงเวลาแล้ว: "${reminder.title}"`);
+        const success = await sendLineMessage(reminder, 'now');
         if (success) {
           reminder.notified = true;
-          await reminder.save();
-          console.log(`[Scheduler] 💾 อัปเดตสถานะ notified: true ลง MongoDB เรียบร้อยค่ะ`);
+          hasChanges = true;
         }
+      }
+
+      if (hasChanges) {
+        await reminder.save();
       }
     }
   } catch (error) {
-    console.error('[Scheduler] ❌ Error checking reminders:', error);
+    console.error('[Scheduler] ❌ Error:', error);
   }
 }
 
-// Schedule cron job to run every 5 minutes
+// Cron Job ทุก 5 นาที
 cron.schedule('*/5 * * * *', async () => {
-  console.log(`[Scheduler] 🔍 เริ่มต้นเช็กงานที่ถึงกำหนดส่ง... (${new Date().toLocaleTimeString('th-TH')})`);
+  console.log(`[Scheduler] 🔍 เช็กงานที่ถึงกำหนด... (${new Date().toLocaleTimeString('th-TH')})`);
   await checkAndNotifyReminders();
 });
 
-// Run a check immediately on server startup (after 2 seconds delay)
+// เช็กรอบแรกทันทีหลังเปิด Server
 setTimeout(async () => {
   console.log(`[Scheduler] 🔍 เช็กกิจกรรมรอบแรกหลังเปิดเซิร์ฟเวอร์...`);
   await checkAndNotifyReminders();
 }, 2000);
 
-console.log(`[Scheduler] ⏰ ระบบ Cron Job แจ้งเตือนเริ่มทำงานแล้ว (รันเช็กทุกๆ 5 นาที)`);
+console.log(`[Scheduler] ⏰ ระบบ Cron Job เริ่มทำงานแล้ว (รันทุก 5 นาที)`);
