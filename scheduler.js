@@ -13,17 +13,17 @@ function sendLineMessage(reminder, type) {
     return Promise.resolve(true);
   }
 
-  // Message template ตามประเภทการแจ้งเตือน
+  // Message template ตามประเภทการแจ้งเตือน (แยกรูปแบบชัดเจน ป้องกันการสับสน)
   let messageText = '';
 
   if (type === '1day') {
-    messageText = `🗓️ เตือนล่วงหน้า 1 วันค่ะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nพรุ่งนี้แล้วนะคะ เตรียมตัวให้พร้อมด้วยนะเตง 💪`;
+    messageText = `🗓️ [แจ้งเตือนล่วงหน้า 1 วัน]\n📢 พรุ่งนี้มีนัดหมายนะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันนัดหมาย: พรุ่งนี้ (${reminder.date})\n⏰ เวลา: ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\n💪 ยังมีเวลาเตรียมตัวค่ะ เตรียมพร้อมไว้ล่วงหน้านะคะ! 💕`;
   } else if (type === '1hour') {
-    messageText = `⏰ อีก 1 ชั่วโมงแล้วนะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nใกล้ถึงเวลาแล้วค่ะ อย่าลืมเตรียมพร้อมด้วยนะคะ! 🌸`;
+    messageText = `⏳ [แจ้งเตือนล่วงหน้า 1 ชั่วโมง]\n⚡ อีก 60 นาทีจะถึงกำหนดแล้วค่ะ!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: วันนี้ (${reminder.date})\n⏰ เวลาที่ต้องทำ: ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\n🌸 ใกล้เข้ามาแล้วค่ะเตง เตรียมตัวเคลียร์งานรอได้เลยน้า! ✊`;
   } else if (type === 'late') {
-    messageText = `⚠️ แจ้งเตือนย้อนหลังค่ะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 กำหนดเวลาเดิม: ${reminder.date} เวลา ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\n(ขออภัยที่แจ้งเตือนล่าช้าเนื่องจากเกิดข้อผิดพลาดหรือระบบขัดข้องก่อนหน้านี้นะคะ เตงอย่าลืมตรวจสอบงานน้า! 🌸)`;
+    messageText = `⚠️ [แจ้งเตือนย้อนหลัง]\n📢 งานนี้เลยกำหนดเวลาแล้วน้าเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 กำหนดเดิม: ${reminder.date} เวลา ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\n🌸 (ขออภัยที่ส่งล่าช้า) เตงอย่าลืมตรวจสอบงานนี้นะคะ! 💕`;
   } else {
-    messageText = `🔔 ถึงเวลาแล้วค่ะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nสู้ๆ นะคะเตง เค้าเป็นกำลังใจให้! 💕`;
+    messageText = `🚨 [ถึงเวลาทำแล้วค่ะเตง!] 🚨\n🎯 ถึงกำหนดเวลาทำแล้วนะเตง ลุยเลย!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลาปัจจุบัน: ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\n💖 สู้ๆ นะคะเตง! เค้าเป็นกำลังใจให้ ทำเสร็จแล้วอย่าลืมมาติ๊กถูกน้า! 🎉`;
   }
 
   const postData = JSON.stringify({
