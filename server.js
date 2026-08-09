@@ -150,6 +150,16 @@ app.delete('/api/reminders/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete reminder' });
   }
 });
+app.get('/api/ping', async (req, res) => {
+  try {
+    const { checkAndNotifyReminders } = require('./scheduler');
+    await checkAndNotifyReminders();
+    res.json({ status: 'ok', message: 'Pong! Gigi checked reminders successfully 🌸', time: new Date().toISOString() });
+  } catch (err) {
+    console.error('Error during ping check:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Start Server after Database Initialization
 db.init().then(() => {

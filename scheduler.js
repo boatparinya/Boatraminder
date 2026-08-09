@@ -146,3 +146,5 @@ setTimeout(async () => {
 }, 2000);
 
 console.log(`[Scheduler] ⏰ ระบบ Cron Job เริ่มทำงานแล้ว (รันทุก 1 นาที)`);
+
+module.exports = { checkAndNotifyReminders, sendLineMessage };
