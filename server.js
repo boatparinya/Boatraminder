@@ -2,28 +2,10 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const mongoose = require('mongoose');
-const Reminder = require('./models/Reminder');
+const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log('==================================================');
-    console.log('✅ เชื่อมต่อ MongoDB Atlas สำเร็จแล้วค่ะ!');
-    console.log('==================================================');
-  })
-  .catch((err) => {
-    console.error('❌ เชื่อมต่อ MongoDB ไม่สำเร็จ:', err.message);
-    process.exit(1);
-  });
-
-// Import and run background scheduler (after DB is ready)
-mongoose.connection.once('open', () => {
-  require('./scheduler');
-});
 
 app.use(cors());
 app.use(express.json());
@@ -41,23 +23,23 @@ app.get('/style.css', (req, res) => {
   res.sendFile(path.join(__dirname, 'style.css'));
 });
 
-// API Routes
+// Helper: Safe time parsing for Thai Timezone (UTC+7)
+function parseReminderTime(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return new Date(NaN);
+  const parts = timeStr.split(':');
+  const hh = (parts[0] || '0').padStart(2, '0');
+  const mm = (parts[1] || '00').padStart(2, '0');
+  const ss = (parts[2] || '00').padStart(2, '0');
+  return new Date(`${dateStr}T${hh}:${mm}:${ss}+07:00`);
+}
 
-// Get all reminders
-app.get('/api/reminders', async (req, res) => {
-  try {
-    const reminders = await Reminder.find().sort({ createdAt: -1 });
-    res.json(reminders);
-  } catch (error) {
-    console.error('Error fetching reminders:', error);
-    res.status(500).json({ error: 'Failed to fetch reminders' });
-  }
-});
-
-// Helper: คำนวณว่าควร skip notification ไหนบ้าง
+// Helper: คำนวณว่าควร skip notification ไหนบ้าง (พร้อมกำหนดเวลามาตรฐานประเทศไทย +07:00)
 function calcNotificationFlags(date, time) {
   const now = new Date();
-  const reminderTime = new Date(`${date}T${time}`);
+  const reminderTime = parseReminderTime(date, time);
+  if (isNaN(reminderTime.getTime())) {
+    return { notified1Day: false, notified1Hour: false, notified: false };
+  }
   const diffMs = reminderTime - now;
   const ONE_DAY_MS  = 24 * 60 * 60 * 1000;
   const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -65,9 +47,22 @@ function calcNotificationFlags(date, time) {
   return {
     notified1Day:  diffMs < ONE_DAY_MS,   // เหลือ < 1 วัน → ข้ามแจ้ง 1 วัน
     notified1Hour: diffMs < ONE_HOUR_MS,  // เหลือ < 1 ชม → ข้ามแจ้ง 1 ชม
-    notified: false
+    notified:      diffMs < 0             // เวลาผ่านไปแล้วตอนสร้าง → ข้ามการแจ้งเตือนย้อนหลัง
   };
 }
+
+// API Routes
+
+// Get all reminders
+app.get('/api/reminders', async (req, res) => {
+  try {
+    const reminders = await db.getAll();
+    res.json(reminders);
+  } catch (error) {
+    console.error('Error fetching reminders:', error);
+    res.status(500).json({ error: 'Failed to fetch reminders' });
+  }
+});
 
 // Add a new reminder
 app.post('/api/reminders', async (req, res) => {
@@ -79,7 +74,7 @@ app.post('/api/reminders', async (req, res) => {
 
   try {
     const flags = calcNotificationFlags(date, time);
-    const newReminder = new Reminder({
+    const saved = await db.create({
       title,
       date,
       time,
@@ -88,7 +83,6 @@ app.post('/api/reminders', async (req, res) => {
       ...flags
     });
 
-    const saved = await newReminder.save();
     res.status(201).json(saved);
   } catch (error) {
     console.error('Error creating reminder:', error);
@@ -101,36 +95,39 @@ app.put('/api/reminders/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const reminder = await Reminder.findById(id);
+    const reminder = await db.getById(id);
     if (!reminder) {
       return res.status(404).json({ error: 'Reminder not found' });
     }
 
+    const updates = {};
+
     // Toggle complete state
     if (req.body.hasOwnProperty('completed')) {
-      reminder.completed = req.body.completed;
+      updates.completed = req.body.completed;
       if (req.body.completed === false) {
-        reminder.notified = false; // Reset if marked active again
+        updates.notified = false; // Reset if marked active again
       }
     }
 
-    if (req.body.title) reminder.title = req.body.title;
+    if (req.body.title) updates.title = req.body.title;
 
     // ถ้าแก้ date หรือ time → คำนวณ flags ใหม่
     if (req.body.date || req.body.time) {
-      if (req.body.date) reminder.date = req.body.date;
-      if (req.body.time) reminder.time = req.body.time;
+      const newDate = req.body.date || reminder.date;
+      const newTime = req.body.time || reminder.time;
+      updates.date = newDate;
+      updates.time = newTime;
 
-      // คำนวณ flags ใหม่ตาม date/time ที่เปลี่ยน
-      const flags = calcNotificationFlags(reminder.date, reminder.time);
-      reminder.notified1Day  = flags.notified1Day;
-      reminder.notified1Hour = flags.notified1Hour;
-      reminder.notified      = false;
+      const flags = calcNotificationFlags(newDate, newTime);
+      updates.notified1Day  = flags.notified1Day;
+      updates.notified1Hour = flags.notified1Hour;
+      updates.notified      = false;
     }
 
-    if (req.body.notes !== undefined) reminder.notes = req.body.notes;
+    if (req.body.notes !== undefined) updates.notes = req.body.notes;
 
-    const updated = await reminder.save();
+    const updated = await db.update(id, updates);
     res.json(updated);
   } catch (error) {
     console.error('Error updating reminder:', error);
@@ -143,7 +140,7 @@ app.delete('/api/reminders/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const deleted = await Reminder.findByIdAndDelete(id);
+    const deleted = await db.delete(id);
     if (!deleted) {
       return res.status(404).json({ error: 'Reminder not found' });
     }
@@ -154,9 +151,15 @@ app.delete('/api/reminders/:id', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`==================================================`);
-  console.log(`🚀 Gigi's Personal Reminder App is running!`);
-  console.log(`🔗 Local Server: http://localhost:${PORT}`);
-  console.log(`==================================================`);
+// Start Server after Database Initialization
+db.init().then(() => {
+  // Start background scheduler
+  require('./scheduler');
+
+  app.listen(PORT, () => {
+    console.log(`==================================================`);
+    console.log(`🚀 Gigi's Personal Reminder App is running!`);
+    console.log(`🔗 Local Server: http://localhost:${PORT}`);
+    console.log(`==================================================`);
+  });
 });

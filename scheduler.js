@@ -1,7 +1,7 @@
 require('dotenv').config();
 const cron = require('node-cron');
 const https = require('https');
-const Reminder = require('./models/Reminder');
+const db = require('./db');
 
 // Send LINE message
 function sendLineMessage(reminder, type) {
@@ -20,6 +20,8 @@ function sendLineMessage(reminder, type) {
     messageText = `🗓️ เตือนล่วงหน้า 1 วันค่ะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nพรุ่งนี้แล้วนะคะ เตรียมตัวให้พร้อมด้วยนะเตง 💪`;
   } else if (type === '1hour') {
     messageText = `⏰ อีก 1 ชั่วโมงแล้วนะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nใกล้ถึงเวลาแล้วค่ะ อย่าลืมเตรียมพร้อมด้วยนะคะ! 🌸`;
+  } else if (type === 'late') {
+    messageText = `⚠️ แจ้งเตือนย้อนหลังค่ะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 กำหนดเวลาเดิม: ${reminder.date} เวลา ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\n(ขออภัยที่แจ้งเตือนล่าช้าเนื่องจากเกิดข้อผิดพลาดหรือระบบขัดข้องก่อนหน้านี้นะคะ เตงอย่าลืมตรวจสอบงานน้า! 🌸)`;
   } else {
     messageText = `🔔 ถึงเวลาแล้วค่ะเตง!\n\n📌 ชื่องาน: ${reminder.title}\n📅 วันที่: ${reminder.date}\n⏰ เวลา: ${reminder.time} น.\n📝 หมายเหตุ: ${reminder.notes || '-'}\n\nสู้ๆ นะคะเตง เค้าเป็นกำลังใจให้! 💕`;
   }
@@ -64,53 +66,66 @@ function sendLineMessage(reminder, type) {
   });
 }
 
+// Parse date and time string safely into Thai Local Time (UTC+7) Date object
+function parseReminderTime(dateStr, timeStr) {
+  if (!dateStr || !timeStr) return new Date(NaN);
+  const parts = timeStr.split(':');
+  const hh = (parts[0] || '0').padStart(2, '0');
+  const mm = (parts[1] || '00').padStart(2, '0');
+  const ss = (parts[2] || '00').padStart(2, '0');
+  return new Date(`${dateStr}T${hh}:${mm}:${ss}+07:00`);
+}
+
 // Core logic: เช็กและแจ้งเตือน
 async function checkAndNotifyReminders() {
   try {
     const now = new Date();
-    const reminders = await Reminder.find({ completed: false });
+    const reminders = await db.getActive();
 
     for (let reminder of reminders) {
-      const reminderTime = new Date(`${reminder.date}T${reminder.time}`);
-      const diffMs = reminderTime - now; // milliseconds เหลืออยู่
+      const reminderTime = parseReminderTime(reminder.date, reminder.time);
+      if (isNaN(reminderTime.getTime())) continue;
+
+      const diffMs = reminderTime - now; // milliseconds เหลืออยู่ก่อนถึงกำหนด
 
       const ONE_DAY_MS   = 24 * 60 * 60 * 1000;
       const ONE_HOUR_MS  = 60 * 60 * 1000;
 
-      let hasChanges = false;
+      const updates = {};
 
-      // 🗓️ แจ้งเตือน 1 วันก่อน (diffMs อยู่ระหว่าง 23h55m ~ 24h5m)
-      if (!reminder.notified1Day && diffMs > 0 && diffMs <= ONE_DAY_MS && diffMs > ONE_HOUR_MS) {
+      // 🗓️ แจ้งเตือน 1 วันก่อน (ถ้าเหลือเวลาอยู่ในช่วง 1 ชม. - 24 ชม.)
+      if (!reminder.notified1Day && diffMs > ONE_HOUR_MS && diffMs <= ONE_DAY_MS) {
         console.log(`[Scheduler] 🗓️ แจ้งล่วงหน้า 1 วัน: "${reminder.title}"`);
         const success = await sendLineMessage(reminder, '1day');
         if (success) {
-          reminder.notified1Day = true;
-          hasChanges = true;
+          updates.notified1Day = true;
         }
       }
 
-      // ⏰ แจ้งเตือน 1 ชั่วโมงก่อน (diffMs อยู่ระหว่าง 0 ~ 1h)
+      // ⏰ แจ้งเตือน 1 ชั่วโมงก่อน (ถ้าเหลือเวลาอยู่ในช่วง 0 - 1 ชม.)
       if (!reminder.notified1Hour && diffMs > 0 && diffMs <= ONE_HOUR_MS) {
         console.log(`[Scheduler] ⏰ แจ้งล่วงหน้า 1 ชม.: "${reminder.title}"`);
         const success = await sendLineMessage(reminder, '1hour');
         if (success) {
-          reminder.notified1Hour = true;
-          hasChanges = true;
+          updates.notified1Hour = true;
         }
       }
 
-      // 🔔 แจ้งเตือนตรงเวลา (diffMs <= 0)
+      // 🔔 แจ้งเตือนเมื่อถึงกำหนดเวลา (diffMs <= 0)
       if (!reminder.notified && diffMs <= 0) {
-        console.log(`[Scheduler] 🔔 ถึงเวลาแล้ว: "${reminder.title}"`);
-        const success = await sendLineMessage(reminder, 'now');
+        // ถ้านับจากเวลาที่กำหนดไว้ (reminderTime) ผ่านไปเกิน 15 นาที ถึงจะถือว่าเป็นแจ้งเตือนย้อนหลัง (Late)
+        const isLateNotification = (now - reminderTime) > 15 * 60 * 1000;
+        const msgType = isLateNotification ? 'late' : 'now';
+
+        console.log(`[Scheduler] ${isLateNotification ? '⚠️ แจ้งเตือนย้อนหลัง (เลยกำหนด > 15 นาที)' : '🔔 ถึงเวลาแล้ว'}: "${reminder.title}"`);
+        const success = await sendLineMessage(reminder, msgType);
         if (success) {
-          reminder.notified = true;
-          hasChanges = true;
+          updates.notified = true;
         }
       }
 
-      if (hasChanges) {
-        await reminder.save();
+      if (Object.keys(updates).length > 0) {
+        await db.update(reminder.id || reminder._id, updates);
       }
     }
   } catch (error) {
@@ -118,8 +133,8 @@ async function checkAndNotifyReminders() {
   }
 }
 
-// Cron Job ทุก 5 นาที
-cron.schedule('*/5 * * * *', async () => {
+// Cron Job รันทุก 1 นาที เพื่อความแม่นยำของเวลา
+cron.schedule('* * * * *', async () => {
   console.log(`[Scheduler] 🔍 เช็กงานที่ถึงกำหนด... (${new Date().toLocaleTimeString('th-TH')})`);
   await checkAndNotifyReminders();
 });
@@ -130,4 +145,4 @@ setTimeout(async () => {
   await checkAndNotifyReminders();
 }, 2000);
 
-console.log(`[Scheduler] ⏰ ระบบ Cron Job เริ่มทำงานแล้ว (รันทุก 5 นาที)`);
+console.log(`[Scheduler] ⏰ ระบบ Cron Job เริ่มทำงานแล้ว (รันทุก 1 นาที)`);
