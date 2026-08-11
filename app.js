@@ -91,7 +91,7 @@ function updateClock() {
 }
 
 // Show custom cute notification toast
-function showToast(message, type = 'success') {
+function showToast(message, type = 'success', duration = 1000) {
   const toast = document.createElement('div');
   toast.className = `toast-item glass-card flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-lg max-w-sm text-sm font-medium text-slate-800`;
   
@@ -122,13 +122,13 @@ function showToast(message, type = 'success') {
   toastContainer.appendChild(toast);
   lucide.createIcons();
   
-  // Remove toast after 3 seconds with animation
+  // Remove toast after duration with animation
   setTimeout(() => {
     toast.classList.add('leaving');
     toast.addEventListener('animationend', () => {
       toast.remove();
     });
-  }, 3000);
+  }, duration);
 }
 
 // Calculate remaining relative time
