@@ -91,7 +91,7 @@ function updateClock() {
 }
 
 // Show custom cute notification toast
-function showToast(message, type = 'success', duration = 1000) {
+function showToast(message, type = 'success', duration = 3000) {
   const toast = document.createElement('div');
   toast.className = `toast-item glass-card flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-lg max-w-sm text-sm font-medium text-slate-800`;
   
