@@ -122,12 +122,12 @@ function showToast(message, type = 'success', duration = 3000) {
   toastContainer.appendChild(toast);
   lucide.createIcons();
   
-  // Remove toast after duration with animation
+  // Start the exit animation after the requested display time.
   setTimeout(() => {
     toast.classList.add('leaving');
-    toast.addEventListener('animationend', () => {
-      toast.remove();
-    });
+
+    // Remove it even if the browser does not emit animationend.
+    setTimeout(() => toast.remove(), 300);
   }, duration);
 }
 
