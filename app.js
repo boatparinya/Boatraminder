@@ -179,12 +179,22 @@ async function fetchReminders() {
 }
 
 
+// Helper: ตรวจสอบว่างานเสร็จสิ้น หรือได้รับการแจ้งเตือน/หมดเวลาแล้ว
+function isReminderDone(r) {
+  if (r.completed) return true;
+  if (r.notified) {
+    const target = new Date(`${r.date}T${r.time}`);
+    if (target - new Date() <= 0) return true;
+  }
+  return false;
+}
+
 // Update Dashboard Statistics
 function updateStats() {
   const todayStr = new Date().toISOString().split('T')[0];
   
-  const activeReminders = reminders.filter(r => !r.completed);
-  const completedCount = reminders.filter(r => r.completed).length;
+  const activeReminders = reminders.filter(r => !isReminderDone(r));
+  const completedCount = reminders.filter(r => isReminderDone(r)).length;
   
   const todayCount = activeReminders.filter(r => r.date === todayStr).length;
   const upcomingCount = activeReminders.filter(r => r.date > todayStr).length;
@@ -203,14 +213,14 @@ function renderReminders() {
   
   const todayStr = new Date().toISOString().split('T')[0];
   
-  // Sort reminders: active by date & time ascending, completed by modified/created date descending
+  // Sort reminders: active by date & time ascending, completed by date & time descending
   const activeReminders = reminders
-    .filter(r => !r.completed)
+    .filter(r => !isReminderDone(r))
     .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
     
   const completedReminders = reminders
-    .filter(r => r.completed)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    .filter(r => isReminderDone(r))
+    .sort((a, b) => new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`));
 
   // 1. Render Active reminders
   const todayTasks = activeReminders.filter(r => r.date === todayStr);
@@ -242,11 +252,11 @@ function renderReminders() {
     });
   }
   
-  // 2. Render Completed reminders
+  // 2. Render Completed / Notified reminders
   if (completedReminders.length === 0) {
     completedList.innerHTML = `
       <div class="glass-card rounded-2xl p-6 text-center text-slate-400 text-sm">
-        ยังไม่มีรายการที่ทำเสร็จเลยค่ะเตง สู้ๆ นะเค้าเป็นกำลังใจให้! ✊
+        ยังไม่มีรายการที่แจ้งเตือนเรียบร้อยเลยค่ะเตง 🌸
       </div>
     `;
   } else {
@@ -271,15 +281,17 @@ function createReminderCard(reminder) {
   const thaiDateStr = eventDate.toLocaleDateString('th-TH', options);
   
   // Calculate relative warning time
-  const timeInfo = reminder.completed ? 
-    `<span class="text-green-600 font-semibold flex items-center gap-1"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i> ทำเสร็จแล้วน้าเตง</span>` : 
+  const isDone = isReminderDone(reminder);
+  const timeInfo = isDone ? 
+    `<span class="text-green-600 font-semibold flex items-center gap-1"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i> แจ้งเตือนเรียบร้อยแล้ว</span>` : 
     getRelativeTime(reminder.date, reminder.time);
 
   card.innerHTML = `
     <div class="flex items-start gap-4 flex-1">
       <!-- Custom Styled Circle Checkbox -->
-      <button onclick="toggleReminder('${reminder.id}', ${reminder.completed})" 
-              class="mt-1 flex-shrink-0 w-6.5 h-6.5 rounded-full border-2 border-slate-300 hover:border-indigo-400 flex items-center justify-center cursor-pointer transition-all duration-200 ${reminder.completed ? 'bg-indigo-500 border-indigo-500 text-white' : 'hover:bg-slate-50 text-transparent'}">
+      <button onclick="toggleReminder('${reminder.id}', ${isDone})" 
+              class="mt-1 flex-shrink-0 w-6.5 h-6.5 rounded-full border-2 border-slate-300 hover:border-indigo-400 flex items-center justify-center cursor-pointer transition-all duration-200 ${isDone ? 'bg-indigo-500 border-indigo-500 text-white' : 'hover:bg-slate-50 text-transparent'}"
+              title="${isDone ? 'คลิกเพื่อย้ายกลับมาเป็นนัดหมายปัจจุบัน' : 'คลิกเพื่อทำเครื่องหมายว่าแจ้งเตือน/เสร็จแล้ว'}">
         <i data-lucide="check" class="w-4 h-4"></i>
       </button>
       
@@ -292,7 +304,7 @@ function createReminderCard(reminder) {
             <i data-lucide="clock-4" class="w-3 h-3"></i> ${reminder.time} น.
           </span>
         </div>
-        <h4 class="text-base font-bold text-slate-800 leading-snug ${reminder.completed ? 'line-through text-slate-400' : ''}">
+        <h4 class="text-base font-bold text-slate-800 leading-snug ${isDone ? 'line-through text-slate-400' : ''}">
           ${reminder.title}
         </h4>
         ${reminder.notes ? `<p class="text-xs text-slate-500 leading-relaxed font-normal bg-slate-50/50 p-2 rounded-xl border border-slate-100/50">${reminder.notes}</p>` : ''}
@@ -543,4 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Fetch initial data
   fetchReminders();
+
+  // Auto-refresh ทุก 20 วินาที เพื่อซิงก์สถานะกับระบบหลังบ้านอัตโนมัติ
+  setInterval(fetchReminders, 20000);
 });

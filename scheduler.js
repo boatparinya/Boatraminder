@@ -121,7 +121,13 @@ async function checkAndNotifyReminders() {
         const success = await sendLineMessage(reminder, msgType);
         if (success) {
           updates.notified = true;
+          updates.completed = true; // ย้ายไปเป็นงานที่แจ้งเตือนเรียบร้อยแล้วทันที
+          console.log(`[Scheduler] ✅ ย้ายงาน "${reminder.title}" ไปยังหมวดที่แจ้งเตือนเรียบร้อยแล้วอัตโนมัติ`);
         }
+      } else if (reminder.notified && !reminder.completed && diffMs <= 0) {
+        // กรณีงานที่เคยแจ้งเตือนไปแล้วในระบบ แต่ completed ยังเป็น false ให้ปรับเป็นเสร็จสิ้นทันที
+        updates.completed = true;
+        console.log(`[Scheduler] 🔄 ซิงก์งานที่แจ้งเตือนแล้ว "${reminder.title}" เข้าหมวดแจ้งเตือนเรียบร้อยแล้ว`);
       }
 
       if (Object.keys(updates).length > 0) {
