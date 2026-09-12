@@ -3,12 +3,17 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const db = require('./db');
+const { handleLineWebhook } = require('./lineWebhook');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 
 // Serve Frontend files
 app.get('/', (req, res) => {
@@ -52,6 +57,8 @@ function calcNotificationFlags(date, time) {
 }
 
 // API Routes
+// LINE Messaging API Webhook
+app.post('/api/line/webhook', handleLineWebhook);
 
 // Get all reminders
 app.get('/api/reminders', async (req, res) => {
