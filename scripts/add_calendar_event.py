@@ -23,7 +23,7 @@ def get_calendar_service():
         
     return build('calendar', 'v3', credentials=creds)
 
-def add_event(title, date_str, start_time_str=None, end_time_str=None, description=None, location=None, all_day=False):
+def add_event(title, date_str, start_time_str=None, end_time_str=None, end_date_str=None, description=None, location=None, all_day=False):
     service = get_calendar_service()
 
     event = {
@@ -42,16 +42,19 @@ def add_event(title, date_str, start_time_str=None, end_time_str=None, descripti
             'timeZone': 'Asia/Bangkok',
         }
         # For all-day events, end date is exclusive in Google Calendar
-        # If it's a single day, end date is the next day
         try:
-            start_date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-            end_date_obj = start_date_obj + timedelta(days=1)
-            end_date_str = end_date_obj.strftime("%Y-%m-%d")
+            if end_date_str:
+                last_date_obj = datetime.strptime(end_date_str, "%Y-%m-%d")
+                end_date_obj = last_date_obj + timedelta(days=1)
+            else:
+                start_date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+                end_date_obj = start_date_obj + timedelta(days=1)
+            final_end_date_str = end_date_obj.strftime("%Y-%m-%d")
         except Exception:
-            end_date_str = date_str
+            final_end_date_str = end_date_str if end_date_str else date_str
             
         event['end'] = {
-            'date': end_date_str,
+            'date': final_end_date_str,
             'timeZone': 'Asia/Bangkok',
         }
     else:
@@ -103,7 +106,8 @@ def add_event(title, date_str, start_time_str=None, end_time_str=None, descripti
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Add event to Google Calendar")
     parser.add_argument("--title", "-t", required=True, help="Event title/summary")
-    parser.add_argument("--date", "-d", required=True, help="Event date in YYYY-MM-DD format")
+    parser.add_argument("--date", "-d", required=True, help="Event start date in YYYY-MM-DD format")
+    parser.add_argument("--end-date", "-ed", help="Event end date in YYYY-MM-DD format (inclusive)")
     parser.add_argument("--start-time", "-st", help="Start time in HH:MM format")
     parser.add_argument("--end-time", "-et", help="End time in HH:MM format")
     parser.add_argument("--description", "--notes", help="Event description or notes")
@@ -118,6 +122,7 @@ if __name__ == '__main__':
             date_str=args.date,
             start_time_str=args.start_time,
             end_time_str=args.end_time,
+            end_date_str=args.end_date,
             description=args.description,
             location=args.location,
             all_day=args.all_day

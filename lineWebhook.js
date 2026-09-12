@@ -405,10 +405,9 @@ async function handleLineWebhook(req, res) {
 
       const replyMsg = `🌸 Gigi บันทึกนัดหมายให้เรียบร้อยแล้วค่ะเตง! 💕\n\n` +
         `📌 ชื่องาน: ${saved.title}\n` +
-        `📅 วันที่: ${thaiFormattedDate} (${saved.date})\n` +
+        `📅 วันที่: ${thaiFormattedDate}\n` +
         `⏰ เวลา: ${saved.time} น.\n\n` +
-        `เค้าจะคอยช่วยเตือนล่วงหน้าให้เหมือนเดิมนะคะ สู้ๆ ค่ะเตง! ✊✨\n` +
-        `🌐 ตรวจสอบบนเว็บ: https://boatraminder.onrender.com`;
+        `เค้าจะคอยช่วยเตือนล่วงหน้าให้เหมือนเดิมนะคะ สู้ๆ ค่ะเตง! ✊✨`;
 
       await sendLineReply(replyToken, [{ type: 'text', text: replyMsg }]);
     } catch (err) {
