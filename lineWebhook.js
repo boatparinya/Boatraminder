@@ -403,11 +403,10 @@ async function handleLineWebhook(req, res) {
       const mNames = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
       const thaiFormattedDate = `${d} ${mNames[m]} ${y + 543}`;
 
-      const replyMsg = `🌸 Gigi บันทึกนัดหมายให้เรียบร้อยแล้วค่ะเตง! 💕\n\n` +
+      const replyMsg = `🌸 เค้าบันทึกงานให้เรียบร้อยแล้วน้าบ! 💕\n\n` +
         `📌 ชื่องาน: ${saved.title}\n` +
         `📅 วันที่: ${thaiFormattedDate}\n` +
-        `⏰ เวลา: ${saved.time} น.\n\n` +
-        `เค้าจะคอยช่วยเตือนล่วงหน้าให้เหมือนเดิมนะคะ สู้ๆ ค่ะเตง! ✊✨`;
+        `⏰ เวลา: ${saved.time} น.\n\n` ;
 
       await sendLineReply(replyToken, [{ type: 'text', text: replyMsg }]);
     } catch (err) {
