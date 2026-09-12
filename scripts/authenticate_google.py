@@ -28,7 +28,21 @@ def get_credentials():
     # เซฟสิทธิ์ไว้ในเครื่อง ต่อไปไม่ต้องล็อกอินซ้ำ
     with open('token.pickle', 'wb') as token:
         pickle.dump(creds, token)
-    print("ล็อกอินสำเร็จ! Antigravity พร้อมเข้าถึง Google Docs ของคุณแล้ว")
+    
+    # อัปเดต .env อัตโนมัติสำหรับ Node.js และระบบหลังบ้าน
+    if os.path.exists('.env') and hasattr(creds, 'refresh_token') and creds.refresh_token:
+        with open('.env', 'r', encoding='utf-8') as ef:
+            env_content = ef.read()
+        import re
+        if 'GOOGLE_REFRESH_TOKEN=' in env_content:
+            env_content = re.sub(r'GOOGLE_REFRESH_TOKEN=.*', f'GOOGLE_REFRESH_TOKEN={creds.refresh_token}', env_content)
+        else:
+            env_content += f"\nGOOGLE_REFRESH_TOKEN={creds.refresh_token}\n"
+        with open('.env', 'w', encoding='utf-8') as ef:
+            ef.write(env_content)
+        print("[+] อัปเดต GOOGLE_REFRESH_TOKEN ลงในไฟล์ .env เรียบร้อยแล้วค่ะ!")
+
+    print("ล็อกอินสำเร็จ! ระบบพร้อมเข้าถึง Google Calendar และ Google Services ของคุณแล้ว")
     return creds
 
 if __name__ == '__main__':

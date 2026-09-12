@@ -2,6 +2,7 @@ require('dotenv').config();
 const crypto = require('crypto');
 const https = require('https');
 const db = require('./db');
+const { addCalendarEvent } = require('./googleCalendar');
 
 // Verify LINE Signature
 function verifySignature(rawBody, signature, secret) {
@@ -395,6 +396,20 @@ async function handleLineWebhook(req, res) {
 
       console.log(`[LINE Webhook] ✅ บันทึกงานสำเร็จ: "${saved.title}" (${saved.date} ${saved.time}) ID: ${saved.id || saved._id}`);
 
+      // ยิงสร้างกิจกรรมลง Google Calendar ไปพร้อมกัน
+      let calSuccess = false;
+      try {
+        const calResult = await addCalendarEvent({
+          title: parsed.title,
+          date: parsed.date,
+          time: parsed.time,
+          description: 'เพิ่มผ่าน Gigi Assistant via LINE 🌸'
+        });
+        calSuccess = calResult && calResult.success;
+      } catch (calErr) {
+        console.warn('[LINE Webhook] ⚠️ ข้าม Google Calendar:', calErr.message);
+      }
+
       // Format Date in Thai for confirmation
       const dateParts = parsed.date.split('-');
       const y = parseInt(dateParts[0], 10);
@@ -403,12 +418,16 @@ async function handleLineWebhook(req, res) {
       const mNames = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
       const thaiFormattedDate = `${d} ${mNames[m]} ${y + 543}`;
 
-      const replyMsg = `🌸 เค้าบันทึกงานให้เรียบร้อยแล้วน้าบ! 💕\n\n` +
+      let replyMsg = `🌸 เค้าบันทึกงานให้เรียบร้อยแล้วน้าบ! 💕\n\n` +
         `📌 ชื่องาน: ${saved.title}\n` +
         `📅 วันที่: ${thaiFormattedDate}\n` +
-        `⏰ เวลา: ${saved.time} น.\n\n` ;
+        `⏰ เวลา: ${saved.time} น.\n\n`;
 
-      await sendLineReply(replyToken, [{ type: 'text', text: replyMsg }]);
+      if (calSuccess) {
+        replyMsg += `📅 ลง Google Calendar ให้เรียบร้อยแล้วด้วยนะคะ ✨\n`;
+      }
+
+      await sendLineReply(replyToken, [{ type: 'text', text: replyMsg.trim() }]);
     } catch (err) {
       console.error('[LINE Webhook] Error creating reminder:', err);
       await sendLineReply(replyToken, [{
